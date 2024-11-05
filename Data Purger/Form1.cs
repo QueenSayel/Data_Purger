@@ -5,31 +5,68 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.WindowsAPICodePack.Taskbar;
+using System.Management;
 
 namespace Data_Purger
 {
     public partial class Form1 : Form
     {
         private int bufferSizeInKB = 64;
-        private int fillPercentage = 100; // Example: Fill 80% of available space, can be controlled by a slider
+        private int fillPercentage = 100;
+        private ManagementEventWatcher usbWatcher;
 
         public Form1()
         {
             InitializeComponent();
             PopulateDriveComboBox();
-            numericPasses.Value = 1; // Set default value to 1
+            numericPasses.Value = 1;
             trackBarBufferSize.Scroll += new EventHandler(trackBarBufferSize_Scroll);
+            comboBoxDrive.SelectedIndexChanged += new EventHandler(comboBoxDrive_SelectedIndexChanged);
+            btnWipeDrive.Enabled = false;
+            StartUsbWatcher();
+        }
+
+        private void StartUsbWatcher()
+        {
+            usbWatcher = new ManagementEventWatcher();
+            WqlEventQuery query = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2 OR EventType = 3");
+            usbWatcher.EventArrived += new EventArrivedEventHandler(OnUsbChanged);
+            usbWatcher.Query = query;
+            usbWatcher.Start();
+        }
+
+        private void OnUsbChanged(object sender, EventArrivedEventArgs e)
+        {
+            Invoke(new Action(PopulateDriveComboBox));
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            if (usbWatcher != null)
+            {
+                usbWatcher.Stop();
+                usbWatcher.Dispose();
+            }
+            base.OnFormClosed(e);
+        }
+
+        private void comboBoxDrive_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
         }
 
         private void PopulateDriveComboBox()
         {
+            comboBoxDrive.Items.Clear();
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 if (drive.IsReady && drive.DriveType == DriveType.Removable)
                 {
-                    comboBoxDrive.Items.Add(drive.Name.Substring(0, 1)); // Add only the drive letter
+                    comboBoxDrive.Items.Add(drive.Name.Substring(0, 1));
                 }
             }
+
+            btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
         }
 
         private async void btnWipeDrive_Click(object sender, EventArgs e)
@@ -47,24 +84,21 @@ namespace Data_Purger
             {
                 for (int i = 1; i <= passes; i++)
                 {
-                    // Update title for formatting stage
                     this.Text = $"Formatting {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Formatting...");
                     await FormatDriveAsync(driveLetter);
 
-                    // Update title for writing stage
                     this.Text = $"Writing to {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Writing random files...");
                     await FillDriveWithRandomFilesAsync(driveLetter);
 
-                    // Update title for post-write formatting stage
                     this.Text = $"Post-write format {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Post-write formatting...");
                     await FormatDriveAsync(driveLetter);
                 }
 
                 Log("Drive wipe operation completed.");
-                this.Text = "Drive wipe complete"; // Final title after the operation
+                this.Text = "Drive wipe complete";
             }
             catch (Exception ex)
             {
@@ -81,7 +115,7 @@ namespace Data_Purger
             comboBoxDrive.Enabled = false;
             trackBarBufferSize.Enabled = false;
             numericPasses.Enabled = false;
-            btnWipeDrive.Enabled = false; // Disable the wipe button
+            btnWipeDrive.Enabled = false;
             checkBoxQuick.Enabled = false;
         }
 
@@ -90,8 +124,8 @@ namespace Data_Purger
             comboBoxDrive.Enabled = true;
             trackBarBufferSize.Enabled = true;
             numericPasses.Enabled = true;
-            btnWipeDrive.Enabled = true; // Enable the wipe button
             checkBoxQuick.Enabled = true;
+            btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
         }
 
         private async Task FormatDriveAsync(string drive)
@@ -111,14 +145,13 @@ namespace Data_Purger
 
                     process.StandardInput.WriteLine("select volume " + drive.Substring(0, 1));
 
-                    // Use quick format if checkBoxQuick is checked
+
                     if (checkBoxQuick.Checked)
                     {
                         process.StandardInput.WriteLine("format fs=ntfs quick label=MyDrive");
                     }
                     else
                     {
-                        // Full format
                         process.StandardInput.WriteLine("format fs=ntfs label=MyDrive");
                     }
 
@@ -131,7 +164,6 @@ namespace Data_Purger
                         {
                             Log($"[Diskpart] {output}");
 
-                            // Extract percentage from the output
                             if (output.Contains("percent complete"))
                             {
                                 int percent = ExtractPercentage(output);
@@ -140,7 +172,6 @@ namespace Data_Purger
                         }
                     });
 
-                    // Wait for the process to complete
                     await process.WaitForExitAsync();
                     await outputTask;
 
@@ -160,7 +191,6 @@ namespace Data_Purger
         }
 
 
-        // Helper method to extract the percentage from the diskpart output
         private int ExtractPercentage(string output)
         {
             var match = System.Text.RegularExpressions.Regex.Match(output, @"(\d+)\s*percent complete");
@@ -171,7 +201,6 @@ namespace Data_Purger
             return 0;
         }
 
-        // Helper method to update the progress bar
         private void UpdateProgressBar(int percent)
         {
             if (progressBar.InvokeRequired)
@@ -183,7 +212,6 @@ namespace Data_Purger
                 progressBar.Value = percent;
             }
 
-            // Update taskbar progress as well
             TaskbarManager.Instance.SetProgressValue(percent, 100);
         }
 
@@ -193,7 +221,6 @@ namespace Data_Purger
 
             DriveInfo driveInfo = new DriveInfo(drive);
 
-            // Continuously check until the drive becomes available
             while (true)
             {
                 if (driveInfo.IsReady)
@@ -202,9 +229,8 @@ namespace Data_Purger
                     break;
                 }
 
-                // Wait a bit before rechecking
-                await Task.Delay(5000); // 5 seconds delay
-                driveInfo = new DriveInfo(drive); // Recreate the DriveInfo object to refresh its state
+                await Task.Delay(5000);
+                driveInfo = new DriveInfo(drive);
             }
         }
 
@@ -225,11 +251,11 @@ namespace Data_Purger
                 while (totalBytesWritten < targetSpace)
                 {
                     string fileName = Path.Combine(drive, $"{GenerateRandomFileName(rand)}{fileExtensions[rand.Next(fileExtensions.Length)]}");
-                    long fileSize = rand.Next(1024 * 10, 1024 * 1024 * 50); // Random file size between 10KB and 50MB
+                    long fileSize = rand.Next(1024 * 10, 1024 * 1024 * 50);
 
                     if (totalBytesWritten + fileSize > targetSpace)
                     {
-                        fileSize = targetSpace - totalBytesWritten; // Adjust the size of the last file if necessary
+                        fileSize = targetSpace - totalBytesWritten;
                     }
 
                     await WriteRandomFileAsync(fileName, fileSize);

@@ -39,6 +39,7 @@
             btnCancel = new Button();
             lblPasses = new Label();
             lblDrive = new Label();
+            bufferLabel = new Label();
             ((System.ComponentModel.ISupportInitialize)trackBarBufferSize).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericPasses).BeginInit();
             SuspendLayout();
@@ -46,14 +47,14 @@
             // comboBoxDrive
             // 
             comboBoxDrive.FormattingEnabled = true;
-            comboBoxDrive.Location = new Point(79, 48);
+            comboBoxDrive.Location = new Point(108, 45);
             comboBoxDrive.Name = "comboBoxDrive";
-            comboBoxDrive.Size = new Size(121, 23);
+            comboBoxDrive.Size = new Size(81, 23);
             comboBoxDrive.TabIndex = 0;
             // 
             // btnWipeDrive
             // 
-            btnWipeDrive.Location = new Point(82, 102);
+            btnWipeDrive.Location = new Point(237, 45);
             btnWipeDrive.Name = "btnWipeDrive";
             btnWipeDrive.RightToLeft = RightToLeft.No;
             btnWipeDrive.Size = new Size(75, 23);
@@ -64,49 +65,50 @@
             // 
             // trackBarBufferSize
             // 
-            trackBarBufferSize.Location = new Point(193, 156);
+            trackBarBufferSize.Location = new Point(32, 187);
             trackBarBufferSize.Maximum = 1024;
             trackBarBufferSize.Minimum = 64;
             trackBarBufferSize.Name = "trackBarBufferSize";
             trackBarBufferSize.Size = new Size(104, 45);
             trackBarBufferSize.TabIndex = 2;
+            trackBarBufferSize.TickFrequency = 0;
             trackBarBufferSize.Value = 64;
             // 
             // labelBufferSize
             // 
             labelBufferSize.AutoSize = true;
-            labelBufferSize.Location = new Point(204, 131);
+            labelBufferSize.Location = new Point(38, 217);
             labelBufferSize.Name = "labelBufferSize";
-            labelBufferSize.Size = new Size(19, 15);
+            labelBufferSize.Size = new Size(36, 15);
             labelBufferSize.TabIndex = 3;
-            labelBufferSize.Text = "64";
+            labelBufferSize.Text = "64 KB";
             // 
             // progressBar
             // 
-            progressBar.Location = new Point(12, 389);
+            progressBar.Location = new Point(12, 442);
             progressBar.Name = "progressBar";
             progressBar.Size = new Size(347, 23);
             progressBar.TabIndex = 4;
             // 
             // logTextBox
             // 
-            logTextBox.Location = new Point(12, 225);
+            logTextBox.Location = new Point(12, 263);
             logTextBox.Multiline = true;
             logTextBox.Name = "logTextBox";
-            logTextBox.Size = new Size(347, 144);
+            logTextBox.Size = new Size(347, 159);
             logTextBox.TabIndex = 5;
             // 
             // numericPasses
             // 
-            numericPasses.Location = new Point(229, 48);
+            numericPasses.Location = new Point(146, 88);
             numericPasses.Name = "numericPasses";
-            numericPasses.Size = new Size(92, 23);
+            numericPasses.Size = new Size(43, 23);
             numericPasses.TabIndex = 6;
             // 
             // checkBoxQuick
             // 
             checkBoxQuick.AutoSize = true;
-            checkBoxQuick.Location = new Point(204, 102);
+            checkBoxQuick.Location = new Point(38, 126);
             checkBoxQuick.Name = "checkBoxQuick";
             checkBoxQuick.Size = new Size(98, 19);
             checkBoxQuick.TabIndex = 7;
@@ -115,7 +117,7 @@
             // 
             // btnCancel
             // 
-            btnCancel.Location = new Point(79, 155);
+            btnCancel.Location = new Point(237, 88);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(75, 23);
             btnCancel.TabIndex = 8;
@@ -125,7 +127,7 @@
             // lblPasses
             // 
             lblPasses.AutoSize = true;
-            lblPasses.Location = new Point(246, 20);
+            lblPasses.Location = new Point(38, 90);
             lblPasses.Name = "lblPasses";
             lblPasses.Size = new Size(102, 15);
             lblPasses.TabIndex = 9;
@@ -134,17 +136,27 @@
             // lblDrive
             // 
             lblDrive.AutoSize = true;
-            lblDrive.Location = new Point(79, 20);
+            lblDrive.Location = new Point(38, 48);
             lblDrive.Name = "lblDrive";
-            lblDrive.Size = new Size(76, 15);
+            lblDrive.Size = new Size(64, 15);
             lblDrive.TabIndex = 10;
-            lblDrive.Text = "Choose drive";
+            lblDrive.Text = "Drive letter";
+            // 
+            // bufferLabel
+            // 
+            bufferLabel.AutoSize = true;
+            bufferLabel.Location = new Point(38, 166);
+            bufferLabel.Name = "bufferLabel";
+            bufferLabel.Size = new Size(61, 15);
+            bufferLabel.TabIndex = 11;
+            bufferLabel.Text = "Buffer size";
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(373, 437);
+            ClientSize = new Size(373, 489);
+            Controls.Add(bufferLabel);
             Controls.Add(lblDrive);
             Controls.Add(lblPasses);
             Controls.Add(btnCancel);
@@ -177,5 +189,6 @@
         private Button btnCancel;
         private Label lblPasses;
         private Label lblDrive;
+        private Label bufferLabel;
     }
 }
