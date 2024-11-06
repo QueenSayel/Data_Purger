@@ -66,6 +66,15 @@ namespace Data_Purger
                 }
             }
 
+            if (comboBoxDrive.Items.Count > 0)
+            {
+                comboBoxDrive.SelectedIndex = 0;  // Select the first item by default
+            }
+            else
+            {
+                comboBoxDrive.SelectedIndex = -1; // Clear selection if no drives
+            }
+
             btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
         }
 
