@@ -37,8 +37,31 @@ namespace Data_Purger
 
         private void OnUsbChanged(object sender, EventArrivedEventArgs e)
         {
-            Invoke(new Action(PopulateDriveComboBox));
+            Invoke(new Action(() =>
+            {
+                if (comboBoxDrive.DroppedDown)
+                {
+                    comboBoxDrive.DroppedDown = false;
+                }
+
+                comboBoxDrive.SelectedIndex = -1;
+                btnWipeDrive.Enabled = false;
+
+                PopulateDriveComboBox();
+
+                if (comboBoxDrive.Items.Count > 0)
+                {
+                    comboBoxDrive.SelectedIndex = 0;
+                    btnWipeDrive.Enabled = true;
+                }
+                else
+                {
+                    comboBoxDrive.SelectedIndex = -1;
+                    btnWipeDrive.Enabled = false;
+                }
+            }));
         }
+
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
@@ -52,12 +75,45 @@ namespace Data_Purger
 
         private void comboBoxDrive_SelectedIndexChanged(object sender, EventArgs e)
         {
-            btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
+            if (comboBoxDrive.SelectedIndex < 0 || comboBoxDrive.SelectedItem == null)
+            {
+                btnWipeDrive.Enabled = false;
+            }
+            else
+            {
+                string selectedDrive = comboBoxDrive.SelectedItem.ToString().ToUpper() + ":\\";
+
+                if (!IsDriveAvailable(selectedDrive))
+                {
+                    MessageBox.Show("The selected drive is no longer available.");
+                    comboBoxDrive.SelectedIndex = -1;
+                    btnWipeDrive.Enabled = false;
+                }
+                else
+                {
+                    btnWipeDrive.Enabled = true;
+                }
+            }
+        }
+
+
+        private bool IsDriveAvailable(string drive)
+        {
+            try
+            {
+                var driveInfo = new DriveInfo(drive);
+                return driveInfo.IsReady;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void PopulateDriveComboBox()
         {
             comboBoxDrive.Items.Clear();
+
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 if (drive.IsReady && drive.DriveType == DriveType.Removable)
@@ -68,24 +124,34 @@ namespace Data_Purger
 
             if (comboBoxDrive.Items.Count > 0)
             {
-                comboBoxDrive.SelectedIndex = 0;  // Select the first item by default
+                comboBoxDrive.SelectedIndex = 0;
             }
             else
             {
-                comboBoxDrive.SelectedIndex = -1; // Clear selection if no drives
+                comboBoxDrive.SelectedIndex = -1;
+                btnWipeDrive.Enabled = false;
             }
-
-            btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
         }
 
         private async void btnWipeDrive_Click(object sender, EventArgs e)
         {
-            DisableControls();
-
-            progressBar.Value = 0;
-            Log("Starting drive wipe operation...");
+            if (comboBoxDrive.SelectedIndex < 0)
+            {
+                Log("No drive selected. Please select a drive and try again.");
+                return;
+            }
 
             string driveLetter = comboBoxDrive.Text.ToUpper() + ":\\";
+
+            if (!IsDriveAvailable(driveLetter))
+            {
+                MessageBox.Show("The selected drive is no longer available. Please select a different drive.");
+                return;
+            }
+
+            DisableControls();
+            progressBar.Value = 0;
+            Log("Starting drive wipe operation...");
 
             int passes = (int)numericPasses.Value;
 
@@ -118,6 +184,7 @@ namespace Data_Purger
                 EnableControls();
             }
         }
+
 
         private void DisableControls()
         {
@@ -274,7 +341,6 @@ namespace Data_Purger
                     int progressPercentage = (int)((totalBytesWritten * 100) / targetSpace);
                     progressBar.Value = progressPercentage;
 
-                    // Update taskbar progress
                     TaskbarManager.Instance.SetProgressValue(progressPercentage, 100);
 
                     Log($"Created {fileName} ({fileSize / 1024} KB)");
