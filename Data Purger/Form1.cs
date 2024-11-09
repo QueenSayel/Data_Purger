@@ -14,6 +14,7 @@ namespace Data_Purger
         private int bufferSizeInKB = 64;
         private int fillPercentage = 100;
         private ManagementEventWatcher usbWatcher;
+        private CancellationTokenSource cancellationTokenSource;
 
         public Form1()
         {
@@ -23,6 +24,7 @@ namespace Data_Purger
             trackBarBufferSize.Scroll += new EventHandler(trackBarBufferSize_Scroll);
             comboBoxDrive.SelectedIndexChanged += new EventHandler(comboBoxDrive_SelectedIndexChanged);
             btnWipeDrive.Enabled = false;
+            btnCancel.Enabled = false;
             StartUsbWatcher();
         }
 
@@ -149,8 +151,12 @@ namespace Data_Purger
                 return;
             }
 
+            cancellationTokenSource = new CancellationTokenSource();
+            CancellationToken token = cancellationTokenSource.Token;
+
             DisableControls();
             progressBar.Value = 0;
+            btnCancel.Enabled = true; // Enable the Cancel button
             Log("Starting drive wipe operation...");
 
             int passes = (int)numericPasses.Value;
@@ -159,30 +165,60 @@ namespace Data_Purger
             {
                 for (int i = 1; i <= passes; i++)
                 {
+                    if (token.IsCancellationRequested)
+                    {
+                        Log("Operation canceled.");
+                        break;
+                    }
+
                     this.Text = $"Formatting {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Formatting...");
-                    await FormatDriveAsync(driveLetter);
+                    await FormatDriveAsync(driveLetter, token);
+
+                    if (token.IsCancellationRequested)
+                    {
+                        Log("Operation canceled.");
+                        break;
+                    }
 
                     this.Text = $"Writing to {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Writing random files...");
-                    await FillDriveWithRandomFilesAsync(driveLetter);
+                    await FillDriveWithRandomFilesAsync(driveLetter, token);
+
+                    if (token.IsCancellationRequested)
+                    {
+                        Log("Operation canceled.");
+                        break;
+                    }
 
                     this.Text = $"Post-write format {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Post-write formatting...");
-                    await FormatDriveAsync(driveLetter);
+                    await FormatDriveAsync(driveLetter, token);
                 }
 
-                Log("Drive wipe operation completed.");
-                this.Text = "Drive wipe complete";
+                if (!token.IsCancellationRequested)
+                {
+                    Log("Drive wipe operation completed.");
+                    this.Text = "Drive wipe complete";
+                }
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                Log($"An error occurred during the process: {ex.Message}");
+                Log("Drive wipe operation was canceled by the user.");
             }
             finally
             {
+                ResetProgress();
                 EnableControls();
+                btnCancel.Enabled = false;
             }
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            // Trigger cancellation
+            cancellationTokenSource?.Cancel();
+            Log("Cancellation requested...");
         }
 
 
@@ -203,8 +239,12 @@ namespace Data_Purger
             checkBoxQuick.Enabled = true;
             btnWipeDrive.Enabled = comboBoxDrive.SelectedIndex >= 0;
         }
-
-        private async Task FormatDriveAsync(string drive)
+        private void ResetProgress()
+        {
+            progressBar.Value = 0;
+            TaskbarManager.Instance.SetProgressState(TaskbarProgressBarState.NoProgress);
+        }
+        private async Task FormatDriveAsync(string drive, CancellationToken token)
         {
             try
             {
@@ -220,17 +260,7 @@ namespace Data_Purger
                     process.Start();
 
                     process.StandardInput.WriteLine("select volume " + drive.Substring(0, 1));
-
-
-                    if (checkBoxQuick.Checked)
-                    {
-                        process.StandardInput.WriteLine("format fs=ntfs quick label=MyDrive");
-                    }
-                    else
-                    {
-                        process.StandardInput.WriteLine("format fs=ntfs label=MyDrive");
-                    }
-
+                    process.StandardInput.WriteLine(checkBoxQuick.Checked ? "format fs=ntfs quick label=MyDrive" : "format fs=ntfs label=MyDrive");
                     process.StandardInput.WriteLine("exit");
 
                     Task outputTask = Task.Run(() =>
@@ -245,8 +275,14 @@ namespace Data_Purger
                                 int percent = ExtractPercentage(output);
                                 UpdateProgressBar(percent);
                             }
+
+                            if (token.IsCancellationRequested)
+                            {
+                                process.Kill();
+                                throw new OperationCanceledException();
+                            }
                         }
-                    });
+                    }, token);
 
                     await process.WaitForExitAsync();
                     await outputTask;
@@ -257,10 +293,10 @@ namespace Data_Purger
                     }
                 }
 
-                await WaitForDriveToBeReadyAsync(drive);
+                await WaitForDriveToBeReadyAsync(drive, token);
                 Log($"Drive {drive} formatted successfully.");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Log($"Error formatting drive {drive}: {ex.Message}");
             }
@@ -291,7 +327,7 @@ namespace Data_Purger
             TaskbarManager.Instance.SetProgressValue(percent, 100);
         }
 
-        private async Task WaitForDriveToBeReadyAsync(string drive)
+        private async Task WaitForDriveToBeReadyAsync(string drive, CancellationToken token)
         {
             Log($"Waiting for drive {drive} to become ready...");
 
@@ -299,18 +335,20 @@ namespace Data_Purger
 
             while (true)
             {
+                if (token.IsCancellationRequested) throw new OperationCanceledException();
+
                 if (driveInfo.IsReady)
                 {
                     Log($"Drive {drive} is now ready.");
                     break;
                 }
 
-                await Task.Delay(5000);
+                await Task.Delay(5000, token);
                 driveInfo = new DriveInfo(drive);
             }
         }
 
-        private async Task FillDriveWithRandomFilesAsync(string drive)
+        private async Task FillDriveWithRandomFilesAsync(string drive, CancellationToken token)
         {
             try
             {
@@ -326,6 +364,8 @@ namespace Data_Purger
 
                 while (totalBytesWritten < targetSpace)
                 {
+                    if (token.IsCancellationRequested) throw new OperationCanceledException();
+
                     string fileName = Path.Combine(drive, $"{GenerateRandomFileName(rand)}{fileExtensions[rand.Next(fileExtensions.Length)]}");
                     long fileSize = rand.Next(1024 * 10, 1024 * 1024 * 50);
 
@@ -334,7 +374,7 @@ namespace Data_Purger
                         fileSize = targetSpace - totalBytesWritten;
                     }
 
-                    await WriteRandomFileAsync(fileName, fileSize);
+                    await WriteRandomFileAsync(fileName, fileSize, token);
 
                     totalBytesWritten += fileSize;
 
@@ -349,13 +389,13 @@ namespace Data_Purger
                 Log($"Drive {drive} filled with random files successfully.");
                 TaskbarManager.Instance.SetProgressState(TaskbarProgressBarState.NoProgress);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Log($"Error filling drive {drive}: {ex.Message}");
             }
         }
 
-        private async Task WriteRandomFileAsync(string fileName, long fileSize)
+        private async Task WriteRandomFileAsync(string fileName, long fileSize, CancellationToken token)
         {
             byte[] buffer = new byte[bufferSizeInKB * 1024];
             Random rand = new Random();
@@ -365,9 +405,11 @@ namespace Data_Purger
                 long bytesWritten = 0;
                 while (bytesWritten < fileSize)
                 {
+                    if (token.IsCancellationRequested) throw new OperationCanceledException();
+
                     rand.NextBytes(buffer);
                     int bytesToWrite = (int)Math.Min(buffer.Length, fileSize - bytesWritten);
-                    await fs.WriteAsync(buffer, 0, bytesToWrite);
+                    await fs.WriteAsync(buffer, 0, bytesToWrite, token);
                     bytesWritten += bytesToWrite;
                 }
             }
