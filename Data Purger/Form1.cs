@@ -156,7 +156,6 @@ namespace Data_Purger
 
             DisableControls();
             progressBar.Value = 0;
-            btnCancel.Enabled = true; // Enable the Cancel button
             Log("Starting drive wipe operation...");
 
             int passes = (int)numericPasses.Value;
@@ -165,32 +164,20 @@ namespace Data_Purger
             {
                 for (int i = 1; i <= passes; i++)
                 {
-                    if (token.IsCancellationRequested)
-                    {
-                        Log("Operation canceled.");
-                        break;
-                    }
-
+                    // Diskpart formatting stage (disable Cancel)
+                    btnCancel.Enabled = false;
                     this.Text = $"Formatting {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Formatting...");
                     await FormatDriveAsync(driveLetter, token);
 
-                    if (token.IsCancellationRequested)
-                    {
-                        Log("Operation canceled.");
-                        break;
-                    }
-
+                    // Filling with random files stage (enable Cancel)
+                    btnCancel.Enabled = true;
                     this.Text = $"Writing to {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Writing random files...");
                     await FillDriveWithRandomFilesAsync(driveLetter, token);
 
-                    if (token.IsCancellationRequested)
-                    {
-                        Log("Operation canceled.");
-                        break;
-                    }
-
+                    // Post-write formatting stage (disable Cancel)
+                    btnCancel.Enabled = false;
                     this.Text = $"Post-write format {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Post-write formatting...");
                     await FormatDriveAsync(driveLetter, token);
@@ -210,7 +197,7 @@ namespace Data_Purger
             {
                 ResetProgress();
                 EnableControls();
-                btnCancel.Enabled = false;
+                btnCancel.Enabled = false; // Ensure Cancel button is disabled after operation
             }
         }
 
@@ -243,6 +230,7 @@ namespace Data_Purger
         {
             progressBar.Value = 0;
             TaskbarManager.Instance.SetProgressState(TaskbarProgressBarState.NoProgress);
+            this.Text = "Data Purger";
         }
         private async Task FormatDriveAsync(string drive, CancellationToken token)
         {
