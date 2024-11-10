@@ -8,10 +8,9 @@ namespace Data_Purger
 {
     public class HeadlessPurger
     {
-        private const int bufferSizeInKB = 64;
         private const int fillPercentage = 100;
 
-        public async Task PurgeDrive(string driveLetter, int passes, bool quickFormat)
+        public async Task PurgeDrive(string driveLetter, int passes, bool quickFormat, int bufferSizeInKB)
         {
             string drivePath = driveLetter.ToUpper() + ":\\";
 
@@ -27,7 +26,7 @@ namespace Data_Purger
                 await FormatDriveAsync(drivePath, quickFormat);
 
                 Console.WriteLine($"Pass {i} of {passes} - Writing random files...");
-                await FillDriveWithRandomFilesAsync(drivePath);
+                await FillDriveWithRandomFilesAsync(drivePath, bufferSizeInKB);
 
                 Console.WriteLine($"Pass {i} of {passes} - Post-write format...");
                 await FormatDriveAsync(drivePath, quickFormat);
@@ -103,28 +102,7 @@ namespace Data_Purger
             }
         }
 
-        private int ExtractPercentage(string output)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(output, @"(\d+)\s*percent complete");
-            if (match.Success)
-            {
-                return int.Parse(match.Groups[1].Value);
-            }
-            return 0;
-        }
-
-        private async Task WaitForDriveToBeReadyAsync(string drive)
-        {
-            DriveInfo driveInfo = new DriveInfo(drive);
-
-            while (!driveInfo.IsReady)
-            {
-                await Task.Delay(5000);
-                driveInfo = new DriveInfo(drive);
-            }
-        }
-
-        private async Task FillDriveWithRandomFilesAsync(string drive)
+        private async Task FillDriveWithRandomFilesAsync(string drive, int bufferSizeInKB)
         {
             try
             {
@@ -148,7 +126,7 @@ namespace Data_Purger
                         fileSize = targetSpace - totalBytesWritten;
                     }
 
-                    await WriteRandomFileAsync(fileName, fileSize);
+                    await WriteRandomFileAsync(fileName, fileSize, bufferSizeInKB);
                     totalBytesWritten += fileSize;
 
                     int progressPercentage = (int)((totalBytesWritten * 100) / targetSpace);
@@ -163,7 +141,7 @@ namespace Data_Purger
             }
         }
 
-        private async Task WriteRandomFileAsync(string fileName, long fileSize)
+        private async Task WriteRandomFileAsync(string fileName, long fileSize, int bufferSizeInKB)
         {
             byte[] buffer = new byte[bufferSizeInKB * 1024];
             Random rand = new Random();
@@ -185,6 +163,22 @@ namespace Data_Purger
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             return new string(Enumerable.Repeat(chars, 8).Select(s => s[rand.Next(s.Length)]).ToArray());
+        }
+
+        private int ExtractPercentage(string output)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(output, @"(\d+)\s*percent complete");
+            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
+        }
+
+        private async Task WaitForDriveToBeReadyAsync(string drive)
+        {
+            DriveInfo driveInfo = new DriveInfo(drive);
+            while (!driveInfo.IsReady)
+            {
+                await Task.Delay(5000);
+                driveInfo = new DriveInfo(drive);
+            }
         }
     }
 }
