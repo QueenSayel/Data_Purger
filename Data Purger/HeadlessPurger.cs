@@ -64,7 +64,29 @@ namespace Data_Purger
                     process.StandardInput.WriteLine(quickFormat ? "format fs=ntfs quick" : "format fs=ntfs");
                     process.StandardInput.WriteLine("exit");
 
+                    Task outputTask = Task.Run(() =>
+                    {
+                        string output;
+                        while ((output = process.StandardOutput.ReadLine()) != null)
+                        {
+                            if (output.Contains("percent complete"))
+                            {
+                                int percent = ExtractPercentage(output);
+
+                                Console.SetCursorPosition(0, Console.CursorTop);
+                                Console.Write(new string(' ', Console.WindowWidth));
+                                Console.SetCursorPosition(0, Console.CursorTop);
+                                Console.Write($"Progress: {percent}%");
+                            }
+                            else
+                            {
+                                Console.WriteLine(output);
+                            }
+                        }
+                    });
+
                     await process.WaitForExitAsync();
+                    await outputTask;
 
                     if (process.ExitCode != 0)
                     {
@@ -72,13 +94,23 @@ namespace Data_Purger
                     }
 
                     await WaitForDriveToBeReadyAsync(drive);
-                    Console.WriteLine($"Drive {drive} formatted successfully.");
+                    Console.WriteLine($"\nDrive {drive} formatted successfully.");
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error formatting drive {drive}: {ex.Message}");
             }
+        }
+
+        private int ExtractPercentage(string output)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(output, @"(\d+)\s*percent complete");
+            if (match.Success)
+            {
+                return int.Parse(match.Groups[1].Value);
+            }
+            return 0;
         }
 
         private async Task WaitForDriveToBeReadyAsync(string drive)

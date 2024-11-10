@@ -13,6 +13,7 @@ namespace Data_Purger
     {
         private int bufferSizeInKB = 64;
         private int fillPercentage = 100;
+        private int lastLoggedPercentage = -1;
         private ManagementEventWatcher usbWatcher;
         private CancellationTokenSource cancellationTokenSource;
 
@@ -64,7 +65,6 @@ namespace Data_Purger
             }));
         }
 
-
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             if (usbWatcher != null)
@@ -97,7 +97,6 @@ namespace Data_Purger
                 }
             }
         }
-
 
         private bool IsDriveAvailable(string drive)
         {
@@ -151,6 +150,8 @@ namespace Data_Purger
                 return;
             }
 
+            lastLoggedPercentage = -1;
+
             cancellationTokenSource = new CancellationTokenSource();
             CancellationToken token = cancellationTokenSource.Token;
 
@@ -164,19 +165,16 @@ namespace Data_Purger
             {
                 for (int i = 1; i <= passes; i++)
                 {
-                    // Diskpart formatting stage (disable Cancel)
                     btnCancel.Enabled = false;
                     this.Text = $"Formatting {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Formatting...");
                     await FormatDriveAsync(driveLetter, token);
 
-                    // Filling with random files stage (enable Cancel)
                     btnCancel.Enabled = true;
                     this.Text = $"Writing to {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Writing random files...");
                     await FillDriveWithRandomFilesAsync(driveLetter, token);
 
-                    // Post-write formatting stage (disable Cancel)
                     btnCancel.Enabled = false;
                     this.Text = $"Post-write format {driveLetter} - Pass {i} of {passes}";
                     Log($"Pass {i} of {passes} - Post-write formatting...");
@@ -197,13 +195,12 @@ namespace Data_Purger
             {
                 ResetProgress();
                 EnableControls();
-                btnCancel.Enabled = false; // Ensure Cancel button is disabled after operation
+                btnCancel.Enabled = false;
             }
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
-            // Trigger cancellation
             cancellationTokenSource?.Cancel();
             Log("Cancellation requested...");
         }
@@ -236,7 +233,7 @@ namespace Data_Purger
         {
             try
             {
-                Log($"Formatting drive {drive}... (This may take a while for a full format)");
+                Log($"Formatting drive {drive}...");
 
                 using (Process process = new Process())
                 {
@@ -317,7 +314,7 @@ namespace Data_Purger
 
         private async Task WaitForDriveToBeReadyAsync(string drive, CancellationToken token)
         {
-            Log($"Waiting for drive {drive} to become ready...");
+            Log($"Waiting for drive {drive} to become ready...", skipTimestamp: true);
 
             DriveInfo driveInfo = new DriveInfo(drive);
 
@@ -409,30 +406,80 @@ namespace Data_Purger
             return new string(Enumerable.Repeat(chars, 8).Select(s => s[rand.Next(s.Length)]).ToArray());
         }
 
-        private void Log(string message)
+        private void Log(string message, bool skipTimestamp = false)
         {
-            if (logTextBox.InvokeRequired)
+            if (skipTimestamp)
             {
-                logTextBox.Invoke(new Action(() =>
+                if (logTextBox.InvokeRequired)
                 {
-                    logTextBox.AppendText($"[{DateTime.Now}] {message}{Environment.NewLine}");
-                }));
+                    logTextBox.Invoke(new Action(() =>
+                    {
+                        logTextBox.AppendText($"{message}{Environment.NewLine}");
+                    }));
+                }
+                else
+                {
+                    logTextBox.AppendText($"{message}{Environment.NewLine}");
+                }
             }
             else
             {
-                logTextBox.AppendText($"[{DateTime.Now}] {message}{Environment.NewLine}");
+                int percent = ExtractPercentage(message);
+                if (percent != -1 && message.Contains("[Diskpart]"))
+                {
+                    if (percent != lastLoggedPercentage)
+                    {
+                        lastLoggedPercentage = percent;
+
+                        if (logTextBox.InvokeRequired)
+                        {
+                            logTextBox.Invoke(new Action(() =>
+                            {
+                                ReplaceLastLogLine(message);
+                            }));
+                        }
+                        else
+                        {
+                            ReplaceLastLogLine(message);
+                        }
+                    }
+                }
+                else
+                {
+                    if (logTextBox.InvokeRequired)
+                    {
+                        logTextBox.Invoke(new Action(() =>
+                        {
+                            logTextBox.AppendText($"[{DateTime.Now}] {message}{Environment.NewLine}");
+                        }));
+                    }
+                    else
+                    {
+                        logTextBox.AppendText($"[{DateTime.Now}] {message}{Environment.NewLine}");
+                    }
+                }
             }
         }
-
+        private void ReplaceLastLogLine(string newText)
+        {
+            string[] lines = logTextBox.Lines;
+            string timestampedText = $"[{DateTime.Now}] {newText}";
+            if (lines.Length > 0)
+            {
+                lines[lines.Length - 1] = timestampedText;
+                logTextBox.Lines = lines;
+            }
+            else
+            {
+                logTextBox.AppendText(timestampedText + Environment.NewLine);
+            }
+            logTextBox.SelectionStart = logTextBox.Text.Length;
+            logTextBox.ScrollToCaret();
+        }
         private void trackBarBufferSize_Scroll(object sender, EventArgs e)
         {
             bufferSizeInKB = trackBarBufferSize.Value;
             labelBufferSize.Text = $"{bufferSizeInKB} KB";
-        }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
         }
     }
 }

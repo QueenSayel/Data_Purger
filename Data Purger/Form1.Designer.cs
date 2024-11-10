@@ -170,6 +170,7 @@
             Controls.Add(btnWipeDrive);
             Controls.Add(comboBoxDrive);
             FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
             Name = "Form1";
             Text = "Data Purger";
             ((System.ComponentModel.ISupportInitialize)trackBarBufferSize).EndInit();
