@@ -9,7 +9,7 @@ using System.Management;
 
 namespace Data_Purger
 {
-    public partial class Form1 : Form
+    public partial class GUI_Mode : Form
     {
         private int bufferSizeInKB = 64;
         private int fillPercentage = 100;
@@ -17,7 +17,7 @@ namespace Data_Purger
         private ManagementEventWatcher usbWatcher;
         private CancellationTokenSource cancellationTokenSource;
 
-        public Form1()
+        public GUI_Mode()
         {
             InitializeComponent();
             PopulateDriveComboBox();
@@ -253,7 +253,7 @@ namespace Data_Purger
                         string output;
                         while ((output = process.StandardOutput.ReadLine()) != null)
                         {
-                            Log($"[Diskpart] {output}");
+                            Log($"[Diskpart] {output.Trim()}");
 
                             if (output.Contains("percent complete"))
                             {

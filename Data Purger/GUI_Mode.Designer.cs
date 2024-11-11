@@ -1,6 +1,6 @@
 ﻿namespace Data_Purger
 {
-    partial class Form1
+    partial class GUI_Mode
     {
         /// <summary>
         ///  Required designer variable.

@@ -6,7 +6,7 @@ using Microsoft.WindowsAPICodePack.Taskbar;
 
 namespace Data_Purger
 {
-    public class HeadlessPurger
+    public class CLI_Mode
     {
         private const int fillPercentage = 100;
 

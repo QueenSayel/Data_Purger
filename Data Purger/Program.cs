@@ -52,7 +52,7 @@ namespace Data_Purger
                     AttachConsole(ATTACH_PARENT_PROCESS);
                     Console.WriteLine("Starting drive wipe operation...");
 
-                    var purger = new HeadlessPurger();
+                    var purger = new CLI_Mode();
                     await purger.PurgeDrive(drive, passes, quickFormat, bufferSizeInKB);
 
                     Console.WriteLine("Drive wipe operation completed.");
@@ -62,7 +62,7 @@ namespace Data_Purger
             }
 
             ApplicationConfiguration.Initialize();
-            Application.Run(new Form1());
+            Application.Run(new GUI_Mode());
         }
 
         private static void DisplayHelp()
