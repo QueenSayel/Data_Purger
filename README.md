@@ -25,9 +25,9 @@ Run `DataPurger.exe` with command-line arguments for automated operation.
 
 **Syntax**:
 
--drive=<drive_letter>   Specifies the drive letter to format and purge
--passes=<number>        Specifies the number of overwrite passes (default: 1)
--quick                  Enables quick format mode
--buffer=<size_kb>       Sets buffer size in KB (between 64 and 1024)
--help                   Displays help message
+- -drive=<drive_letter>   Specifies the drive letter to format and purge
+- -passes=<number>        Specifies the number of overwrite passes (default: 1)
+- -quick                  Enables quick format mode
+- -buffer=<size_kb>       Sets buffer size in KB (between 64 and 1024)
+- -help                   Displays help message
 
